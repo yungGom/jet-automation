@@ -55,6 +55,10 @@ def load_data_file(uploaded_file):
         # 컬럼명 정리 (오타 수정 및 공백 제거)
         df.columns = df.columns.str.strip().str.replace('차변진액', '차변잔액')
         
+        # 계정코드를 문자열로 통일
+        if '계정코드' in df.columns:
+            df['계정코드'] = df['계정코드'].astype(str).str.strip()
+        
         # 숫자형 컬럼 변환 및 결측치 처리
         numeric_columns = ['차변잔액', '대변잔액', '차변금액', '대변금액']
         for col in numeric_columns:
@@ -147,56 +151,68 @@ def scenario_a03_rollforward_test(prev_tb, journal_df, curr_tb):
     if not all([prev_tb is not None, journal_df is not None, curr_tb is not None]):
         return None, "필요한 데이터가 모두 업로드되지 않았습니다."
     
-    # 분개장에서 계정코드별 집계
-    journal_summary = journal_df.groupby('계정코드').agg({
-        '차변금액': 'sum',
-        '대변금액': 'sum'
-    }).reset_index()
-    
-    # 전기 시산표 준비
-    prev_tb_clean = prev_tb.copy()
-    prev_tb_clean['차변잔액'] = pd.to_numeric(prev_tb_clean['차변잔액'], errors='coerce').fillna(0)
-    prev_tb_clean['대변잔액'] = pd.to_numeric(prev_tb_clean['대변잔액'], errors='coerce').fillna(0)
-    
-    # 당기 시산표 준비
-    curr_tb_clean = curr_tb.copy()
-    curr_tb_clean['차변잔액'] = pd.to_numeric(curr_tb_clean['차변잔액'], errors='coerce').fillna(0)
-    curr_tb_clean['대변잔액'] = pd.to_numeric(curr_tb_clean['대변잔액'], errors='coerce').fillna(0)
-    
-    # 전기 시산표와 분개장 합계 병합
-    merged = prev_tb_clean.merge(journal_summary, on='계정코드', how='outer', suffixes=('_prev', '_journal'))
-    
-    # 결측값을 0으로 처리
-    for col in ['차변잔액', '대변잔액', '차변금액', '대변금액']:
-        if col in merged.columns:
-            merged[col] = merged[col].fillna(0)
-    
-    # 계산된 당기 잔액 구하기
-    merged['계산된_차변잔액'] = merged['차변잔액'] + merged['차변금액'] - merged['대변금액']
-    merged['계산된_대변잔액'] = merged['대변잔액'] + merged['대변금액'] - merged['차변금액']
-    
-    # 차변/대변 잔액 조정 (음수인 경우 반대편으로 이동)
-    merged.loc[merged['계산된_차변잔액'] < 0, '계산된_대변잔액'] = abs(merged.loc[merged['계산된_차변잔액'] < 0, '계산된_차변잔액'])
-    merged.loc[merged['계산된_차변잔액'] < 0, '계산된_차변잔액'] = 0
-    
-    merged.loc[merged['계산된_대변잔액'] < 0, '계산된_차변잔액'] = abs(merged.loc[merged['계산된_대변잔액'] < 0, '계산된_대변잔액'])
-    merged.loc[merged['계산된_대변잔액'] < 0, '계산된_대변잔액'] = 0
-    
-    # 당기 시산표와 비교
-    comparison = merged.merge(curr_tb_clean, on='계정코드', how='outer', suffixes=('_calc', '_actual'))
-    
-    for col in ['차변잔액_actual', '대변잔액_actual']:
-        if col in comparison.columns:
-            comparison[col] = comparison[col].fillna(0)
-    
-    # 차이 계산
-    comparison['차변_차이'] = comparison['계산된_차변잔액'] - comparison['차변잔액_actual']
-    comparison['대변_차이'] = comparison['계산된_대변잔액'] - comparison['대변잔액_actual']
-    
-    # 차이가 있는 항목만 필터링
-    differences = comparison[(abs(comparison['차변_차이']) > 0.01) | (abs(comparison['대변_차이']) > 0.01)]
-    
-    return differences, None
+    try:
+        # 분개장에서 계정코드별 집계
+        journal_summary = journal_df.groupby('계정코드').agg({
+            '차변금액': 'sum',
+            '대변금액': 'sum'
+        }).reset_index()
+        
+        # 전기 시산표 준비
+        prev_tb_clean = prev_tb.copy()
+        prev_tb_clean['계정코드'] = prev_tb_clean['계정코드'].astype(str).str.strip()
+        prev_tb_clean['차변잔액'] = pd.to_numeric(prev_tb_clean['차변잔액'], errors='coerce').fillna(0)
+        prev_tb_clean['대변잔액'] = pd.to_numeric(prev_tb_clean['대변잔액'], errors='coerce').fillna(0)
+        
+        # 당기 시산표 준비
+        curr_tb_clean = curr_tb.copy()
+        curr_tb_clean['계정코드'] = curr_tb_clean['계정코드'].astype(str).str.strip()
+        curr_tb_clean['차변잔액'] = pd.to_numeric(curr_tb_clean['차변잔액'], errors='coerce').fillna(0)
+        curr_tb_clean['대변잔액'] = pd.to_numeric(curr_tb_clean['대변잔액'], errors='coerce').fillna(0)
+        
+        # 분개장 계정코드 정리
+        journal_summary['계정코드'] = journal_summary['계정코드'].astype(str).str.strip()
+        
+        # 전기 시산표와 분개장 합계 병합
+        merged = prev_tb_clean.merge(journal_summary, on='계정코드', how='outer', suffixes=('_prev', '_journal'))
+        
+        # 결측값을 0으로 처리
+        for col in ['차변잔액', '대변잔액', '차변금액', '대변금액']:
+            if col in merged.columns:
+                merged[col] = merged[col].fillna(0)
+        
+        # 계산된 당기 잔액 구하기
+        merged['계산된_차변잔액'] = merged['차변잔액'] + merged['차변금액'] - merged['대변금액']
+        merged['계산된_대변잔액'] = merged['대변잔액'] + merged['대변금액'] - merged['차변금액']
+        
+        # 차변/대변 잔액 조정 (음수인 경우 반대편으로 이동)
+        negative_dr_mask = merged['계산된_차변잔액'] < 0
+        merged.loc[negative_dr_mask, '계산된_대변잔액'] = merged.loc[negative_dr_mask, '계산된_대변잔액'] + abs(merged.loc[negative_dr_mask, '계산된_차변잔액'])
+        merged.loc[negative_dr_mask, '계산된_차변잔액'] = 0
+        
+        negative_cr_mask = merged['계산된_대변잔액'] < 0
+        merged.loc[negative_cr_mask, '계산된_차변잔액'] = merged.loc[negative_cr_mask, '계산된_차변잔액'] + abs(merged.loc[negative_cr_mask, '계산된_대변잔액'])
+        merged.loc[negative_cr_mask, '계산된_대변잔액'] = 0
+        
+        # 당기 시산표와 비교
+        comparison = merged.merge(curr_tb_clean, on='계정코드', how='outer', suffixes=('_calc', '_actual'))
+        
+        # 결측값 처리
+        for col in ['계산된_차변잔액', '계산된_대변잔액', '차변잔액_actual', '대변잔액_actual']:
+            if col in comparison.columns:
+                comparison[col] = comparison[col].fillna(0)
+        
+        # 차이 계산
+        comparison['차변_차이'] = comparison['계산된_차변잔액'] - comparison['차변잔액_actual']
+        comparison['대변_차이'] = comparison['계산된_대변잔액'] - comparison['대변잔액_actual']
+        
+        # 차이가 있는 항목만 필터링 (0.01원 이상 차이)
+        differences = comparison[(abs(comparison['차변_차이']) > 0.01) | (abs(comparison['대변_차이']) > 0.01)]
+        
+        return differences, None
+        
+    except Exception as e:
+        return None, f"Roll-forward 테스트 중 오류 발생: {str(e)}"
 
 def scenario_b01_large_items_test(journal_df, materiality_threshold=1000000):
     """B01: 손익계정별 중요성금액 기준 분석"""
