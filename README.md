@@ -8,7 +8,6 @@
 ## 🌐 라이브 데모
 👉 **[JET 자동화 프로그램 체험하기](https://jet-automation.streamlit.app)**
 
-> 배포 완료 후 실제 URL로 업데이트하세요!
 
 ## 🚀 주요 기능
 
