@@ -36,8 +36,8 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Streamlit
-.streamlit/
+# Streamlit secrets (but keep config)
+.streamlit/secrets.toml
 
 # Data files (보안상 실제 데이터는 제외)
 *.xlsx

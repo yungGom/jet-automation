@@ -6,7 +6,9 @@
 회계감사 절차 중 저널 엔트리 테스트(JET)를 자동화하는 Streamlit 웹 애플리케이션입니다.
 
 ## 🌐 라이브 데모
-👉 **[JET 자동화 프로그램 체험하기](https://your-app-url.streamlit.app)**
+👉 **[JET 자동화 프로그램 체험하기](https://jet-automation.streamlit.app)**
+
+> 배포 완료 후 실제 URL로 업데이트하세요!
 
 ## 🚀 주요 기능
 
